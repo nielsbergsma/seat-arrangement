@@ -1,0 +1,8 @@
+dist/
+dist-newstyle/
+
+.DS_Store
+
+cabal.project
+Snippets.md
+Main.hs

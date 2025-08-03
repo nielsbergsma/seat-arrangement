@@ -1,0 +1,62 @@
+cabal-version:      3.4
+name:               seat-arrangement
+version:            0.1.0.0
+license:            BSD-3-Clause
+author:             Niels Bergsma
+maintainer:         n.bergsma@gmail.com
+category:           Data
+build-type:         Simple
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:
+        Aggregate.Reservation
+        Aggregate.Seat
+        Aggregate.Assignment
+        Aggregate.Proposal
+        Aggregate.SeatArrangement
+        Constraint
+        Extension.Refined
+        Extension.Data
+
+    default-extensions:
+        OverloadedStrings
+        OverloadedRecordDot
+        RecordWildCards
+        DeriveAnyClass
+        DerivingStrategies
+        GADTs
+        AllowAmbiguousTypes
+        ViewPatterns
+        PatternSynonyms
+        ImportQualifiedPost
+
+    build-depends:    
+        base >=4.14 && <5,
+        containers,
+        bimap,
+        text,
+        refined,
+        these-skinny,
+        uuid
+
+    hs-source-dirs:   src
+    default-language: GHC2024
+
+test-suite spec
+    type:                exitcode-stdio-1.0
+    hs-source-dirs:      test
+    main-is:             Spec.hs
+    build-depends:
+        base >=4.14 && <5,
+        tasty,
+        tasty-hunit,
+        ha-ortools-sat-example,
+        bytestring,
+        base64-bytestring,
+        mtl
+    
+    default-language:    GHC2024
