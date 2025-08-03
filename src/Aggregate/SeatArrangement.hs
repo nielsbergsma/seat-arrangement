@@ -3,27 +3,27 @@ module Aggregate.SeatArrangement
   , SeatArrangement(..)
   , SomeSeatArrangement(..)
   
-  -- * Operations related to 'Registered' lifecycle
+  -- * Operations related to 'Registered' phase
   , mkSeatArrangement
   , SetReservationProblem
   , CanSetReservation(..)
 
-  -- * Operations related to 'Proposable' lifecycle
+  -- * Operations related to 'Proposable' phase
   , RemoveReservationResult(..)
   , CanRemoveReservation(..)
   , solicit
 
-  -- * Operations related to 'Solicitable' lifecycle
+  -- * Operations related to 'Solicitable' phase
   , ParseProposalProblem(..)
   , parseProposals
 
-  -- * Operations related to 'Announcable' lifecycle
+  -- * Operations related to 'Announcable' phase
   , ProposalsForReservationProblem(..)
   , proposalsForReservation
   , ConfirmProblem(..)
   , confirm
 
-  -- * Operations related to 'Boarable' lifecycle
+  -- * Operations related to 'Boarable' phase
   , BoardingProblem(..)
   , board
   ) where 
@@ -65,7 +65,7 @@ data SomeSeatArrangement (lc :: SeatArrangementLifecycle) where
 
 type SetReservationProblem = ReservationsProblem
 
--- | Add reservation to seat arrangement, applicable in 'Registered' and 'Proposable' lifecycles
+-- | Add reservation to seat arrangement, applicable in 'Registered' and 'Proposable' phase
 class CanSetReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
   setReservation :: Reservation -> SeatArrangement sc lc -> Either SetReservationProblem (SeatArrangement sc 'Proposable)
 
@@ -74,14 +74,14 @@ data RemoveReservationResult (sc :: Nat)
   = RegisteredAfterRemoval (SeatArrangement sc 'Registered)
   | ProposableAfterRemoval (SeatArrangement sc 'Proposable)
 
--- | Removes reservation from seat arrangement, applicable in 'Proposable' lifecycle
+-- | Removes reservation from seat arrangement, applicable in 'Proposable' phase
 -- 
--- /note that it can transitition to 'Registered' lifecycle, when no reservations are present after removal/
+-- /note that it can transitition to 'Registered' phase, when no reservations are present after removal/
 class CanRemoveReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
   removeReservation :: ReservationId -> SeatArrangement sc lc -> RemoveReservationResult sc
 
 
--- * Operations related to 'Registered' lifecycle
+-- * Operations related to 'Registered' phase
 -- | Creates an empty 'SeatArrangement', based on the 'NumberOfSeats'
 mkSeatArrangement :: NumberOfSeats -> SomeSeatArrangement 'Registered
 mkSeatArrangement numberOfSeats =
@@ -95,7 +95,7 @@ instance KnownNat sc => CanSetReservation sc 'Registered where
       Right reservations' -> Right (SeatArrangementProposable reservations')
 
 
--- * Operations related to 'Proposable' lifecycle
+-- * Operations related to 'Proposable' phase
 instance KnownNat sc => CanSetReservation sc 'Proposable where
   setReservation reservation (SeatArrangementProposable reservations) = 
     case rerefine (Set.insert reservation) reservations of
@@ -112,11 +112,11 @@ instance KnownNat sc => CanRemoveReservation sc 'Proposable where
       reservations' = Set.filter (not . match) reservations
       match (Reservation id' _) = reservation == id'
 
--- | Ends Proposable lifestage, collecting proposals 
+-- | Ends 'Proposable' phase, collecting proposals 
 solicit :: KnownNat sc => SeatArrangement sc 'Proposable -> SeatArrangement sc 'Solicitable
 solicit (SeatArrangementProposable reservations) = SeatArrangementSolicitable reservations
 
--- * Operations related to 'Solicitable' lifecycle
+-- * Operations related to 'Solicitable' phase
 data ParseProposalProblem 
   = ProposalDoesNotCoverAllReservations
   deriving stock (Eq, Ord)
@@ -141,7 +141,7 @@ parseProposalForReservations (Refined reservations) proposal@(Refined assignment
     covered = all (`Bimap.member` assignments) . passengersOfReservation
 
 
--- * Operations related to 'Announcable' lifecycle
+-- * Operations related to 'Announcable' phase
 data ProposalsForReservationProblem
   = ProposalsForReservationNotFound
   | ProposalsForReservationCorrupt
@@ -205,7 +205,7 @@ confirm reservation reservationAssignments@(Refined passengerAssignments) arrang
         Right (Refined availableProposals) -> Set.member reservationAssignments availableProposals
 
 
--- * Operations related to 'Boarable' lifecycle
+-- * Operations related to 'Boarable' phase
 
 data BoardingProblem 
   = BoardingDisallowsUnassignedSeats
