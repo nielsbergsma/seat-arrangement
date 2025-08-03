@@ -11,6 +11,9 @@ module Aggregate.SeatArrangement
   -- * Operations related to 'Proposable' lifecycle
   , RemoveReservationResult(..)
   , CanRemoveReservation(..)
+  , solicit
+
+  -- * Operations related to 'Solicitable' lifecycle
   , ParseProposalProblem(..)
   , parseProposals
 
@@ -40,14 +43,20 @@ import Aggregate.Reservation (Reservations, Reservation(..), ReservationId, Pass
 import Extension.Refined (pattern Refined, refine, rerefine, unrefine)
 
 
-data SeatArrangementLifecycle = Registered | Proposable | Announceable | Boardable
+data SeatArrangementLifecycle = Registered | Proposable | Solicitable | Announceable | Boarded
 
 
 data SeatArrangement (sc :: Nat) (lc :: SeatArrangementLifecycle) where
+  -- | Start of lifecycle, when a flight is scheduled, accepts reservations
   SeatArrangementRegistered   :: SeatArrangement sc 'Registered
+  -- | Accepts more reservations and removals
   SeatArrangementProposable   :: Reservations sc -> SeatArrangement sc 'Proposable
+  -- | Reservations no longer accepted, collecting proposals 
+  SeatArrangementSolicitable  :: Reservations sc -> SeatArrangement sc 'Solicitable
+  -- | Assignment proposals available, accepting confirmations 
   SeatArrangementAnnounceable :: Proposals sc -> ConfirmableAssignments sc -> SeatArrangement sc 'Announceable
-  SeatArrangementBoardable    :: Assignments sc -> SeatArrangement sc 'Boardable
+  -- | End of lifecycle
+  SeatArrangementBoarded      :: Assignments sc -> SeatArrangement sc 'Boarded
 
 
 data SomeSeatArrangement (lc :: SeatArrangementLifecycle) where
@@ -103,15 +112,18 @@ instance KnownNat sc => CanRemoveReservation sc 'Proposable where
       reservations' = Set.filter (not . match) reservations
       match (Reservation id' _) = reservation == id'
 
+-- | Ends Proposable lifestage, collecting proposals 
+solicit :: KnownNat sc => SeatArrangement sc 'Proposable -> SeatArrangement sc 'Solicitable
+solicit (SeatArrangementProposable reservations) = SeatArrangementSolicitable reservations
 
+-- * Operations related to 'Solicitable' lifecycle
 data ParseProposalProblem 
   = ProposalDoesNotCoverAllReservations
   deriving stock (Eq, Ord)
 
-
 -- | Parses proposals to 'SeatArrangement', on success the lifecycle transitions to 'Announceable'
-parseProposals :: KnownNat sc => Proposals sc -> SeatArrangement sc 'Proposable -> Either ParseProposalProblem (SeatArrangement sc 'Announceable)
-parseProposals proposals (SeatArrangementProposable reservations) 
+parseProposals :: KnownNat sc => Proposals sc -> SeatArrangement sc 'Solicitable -> Either ParseProposalProblem (SeatArrangement sc 'Announceable)
+parseProposals proposals (SeatArrangementSolicitable reservations) 
   | Just problem <- headLeft problems = Left problem
   | Right assignments <- refine confirmableAssignments = Right (SeatArrangementAnnounceable proposals assignments)
   | otherwise = Left ProposalDoesNotCoverAllReservations
@@ -179,8 +191,8 @@ confirm reservation reservationAssignments@(Refined passengerAssignments) arrang
       Left exception                 -> Left . ConfirmProposalAssignmentProblem $ parseAssignmentsProblem exception
       Right confirmableAssignments'' -> Right (SeatArrangementAnnounceable proposals confirmableAssignments'')
   where 
-    assignmentsOverlap 
-      = Bimap.size confirmableAssignments /= Bimap.size confirmableAssignments'
+    assignmentsOverlap = 
+      Bimap.size confirmableAssignments /= Bimap.size confirmableAssignments'
 
     confirmableAssignments' = 
       Bimap.fold Bimap.insert 
@@ -202,12 +214,12 @@ data BoardingProblem
 -- | Start boarding
 -- 
 -- /Precondition: all seats needs to assigned/
-board :: KnownNat sc => SeatArrangement sc 'Announceable -> Either BoardingProblem (SeatArrangement sc 'Boardable)
+board :: KnownNat sc => SeatArrangement sc 'Announceable -> Either BoardingProblem (SeatArrangement sc 'Boarded)
 board (SeatArrangementAnnounceable _ assignments)
   | Bimap.null unconfirmedAssignments = 
       case refine confirmedAssignments of
         Left _          -> Left BoardingDisallowsUnassignedSeats
-        Right confirmed -> Right (SeatArrangementBoardable confirmed)
+        Right confirmed -> Right (SeatArrangementBoarded   confirmed)
   | otherwise = Left BoardingDisallowsUnassignedSeats
   where 
     (confirmedAssignments, unconfirmedAssignments) = partitionConfirmableAssignments assignments
