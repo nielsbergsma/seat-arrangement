@@ -6,11 +6,11 @@ module Aggregate.SeatArrangement
   -- * Operations related to 'Initialising' phase
   , initialise
   , RegisterProblem
-  , CanRegisterReservation(..)
+  , CanRegister(..)
 
   -- * Operations related to 'Registering' phase
   , UnregisterResult(..)
-  , CanUnregisterReservation(..)
+  , CanUnregister(..)
   , propose
 
   -- * Operations related to 'Proposing' phase
@@ -46,7 +46,7 @@ import Extension.Refined (pattern Refined, refine, rerefine, unrefine)
 data SeatArrangementLifecycle = Initialising | Registering | Proposing | Confirming | Boarding
 
 data SeatArrangement (sc :: Nat) (lc :: SeatArrangementLifecycle) where
-  -- | Start of lifecycle, when a flight is scheduled, accepts reservations
+  -- | Initialise lifecycle, when a flight is scheduled, accepts reservations
   SeatArrangementInitialising :: SeatArrangement sc 'Initialising
   -- | Register/unregister reservations
   SeatArrangementRegistering  :: Reservations sc -> SeatArrangement sc 'Registering
@@ -65,19 +65,19 @@ data SomeSeatArrangement (lc :: SeatArrangementLifecycle) where
 type RegisterProblem = ReservationsProblem
 
 -- | Register reservation to seat arrangement, applicable in 'Initialising' and 'Registering' phase
-class CanRegisterReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
+class CanRegister (sc :: Nat) (lc :: SeatArrangementLifecycle) where
   register :: Reservation -> SeatArrangement sc lc -> Either RegisterProblem (SeatArrangement sc 'Registering)
 
 
 data UnregisterResult (sc :: Nat)
-  = RegisteredAfterRemoval (SeatArrangement sc 'Initialising)
-  | ProposableAfterRemoval (SeatArrangement sc 'Registering)
+  = InitialisingAfterRemoval (SeatArrangement sc 'Initialising)
+  | RegsteringAfterRemoval (SeatArrangement sc 'Registering)
 
 -- | Unregisters reservation from seat arrangement, applicable in 'Registering' phase
 -- 
--- /note that it can transitition to 'Initialising' phase, when no reservations are present after removal/
-class CanUnregisterReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
-  unregisterReservation :: ReservationId -> SeatArrangement sc lc -> UnregisterResult sc
+-- /note that it can transitition to 'Initialising' phase, when no reservations are present after unregister/
+class CanUnregister (sc :: Nat) (lc :: SeatArrangementLifecycle) where
+  unregister :: ReservationId -> SeatArrangement sc lc -> UnregisterResult sc
 
 
 -- * Operations related to 'Initialising' phase
@@ -87,7 +87,7 @@ initialise numberOfSeats =
   case seatCapacity numberOfSeats of 
     SomeNat (Proxy :: Proxy sc) -> SomeSeatArrangement (SeatArrangementInitialising @sc)
 
-instance KnownNat sc => CanRegisterReservation sc 'Initialising where
+instance KnownNat sc => CanRegister sc 'Initialising where
   register reservation SeatArrangementInitialising = 
     case refine (Set.singleton reservation) of
       Left exception      -> Left (parseReservationsProblem exception)
@@ -95,18 +95,18 @@ instance KnownNat sc => CanRegisterReservation sc 'Initialising where
 
 
 -- * Operations related to 'Registering' phase
-instance KnownNat sc => CanRegisterReservation sc 'Registering where
+instance KnownNat sc => CanRegister sc 'Registering where
   register reservation (SeatArrangementRegistering reservations) = 
     case rerefine (Set.insert reservation) reservations of
       Left exception      -> Left (parseReservationsProblem exception)
       Right reservations' -> Right (SeatArrangementRegistering reservations')
 
 
-instance KnownNat sc => CanUnregisterReservation sc 'Registering where
-  unregisterReservation reservation (SeatArrangementRegistering (Refined reservations)) = 
+instance KnownNat sc => CanUnregister sc 'Registering where
+  unregister reservation (SeatArrangementRegistering (Refined reservations)) = 
     case refine reservations' of
-      Left _               -> RegisteredAfterRemoval SeatArrangementInitialising
-      Right reservations'' -> ProposableAfterRemoval (SeatArrangementRegistering reservations'')
+      Left _               -> InitialisingAfterRemoval SeatArrangementInitialising
+      Right reservations'' -> RegsteringAfterRemoval (SeatArrangementRegistering reservations'')
     where 
       reservations' = Set.filter (not . match) reservations
       match (Reservation id' _) = reservation == id'
