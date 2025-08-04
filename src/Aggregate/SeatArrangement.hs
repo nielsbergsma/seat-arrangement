@@ -3,27 +3,27 @@ module Aggregate.SeatArrangement
   , SeatArrangement(..)
   , SomeSeatArrangement(..)
   
-  -- * Operations related to 'Registered' phase
-  , mkSeatArrangement
-  , SetReservationProblem
-  , CanSetReservation(..)
+  -- * Operations related to 'Initialised' phase
+  , initialise
+  , RegisterReservationProblem
+  , CanRegisterReservation(..)
 
-  -- * Operations related to 'Proposable' phase
-  , RemoveReservationResult(..)
-  , CanRemoveReservation(..)
-  , solicit
+  -- * Operations related to 'Registering' phase
+  , UnregisterReservationResult(..)
+  , CanUnregisterReservation(..)
+  , propose
 
-  -- * Operations related to 'Solicitable' phase
-  , ParseProposalProblem(..)
+  -- * Operations related to 'Proposing' phase
+  , ProposalProblem(..)
   , parseProposals
 
-  -- * Operations related to 'Announcable' phase
+  -- * Operations related to 'Confirming' phase
   , ProposalsForReservationProblem(..)
   , proposalsForReservation
   , ConfirmProblem(..)
   , confirm
 
-  -- * Operations related to 'Boarable' phase
+  -- * Operations related to 'Boarding' phase
   , BoardingProblem(..)
   , board
   ) where 
@@ -43,89 +43,88 @@ import Aggregate.Reservation (Reservations, Reservation(..), ReservationId, Pass
 import Extension.Refined (pattern Refined, refine, rerefine, unrefine)
 
 
-data SeatArrangementLifecycle = Registered | Proposable | Solicitable | Announceable | Boarded
-
+data SeatArrangementLifecycle = Initialised | Registering | Proposing | Confirming | Boarding
 
 data SeatArrangement (sc :: Nat) (lc :: SeatArrangementLifecycle) where
   -- | Start of lifecycle, when a flight is scheduled, accepts reservations
-  SeatArrangementRegistered   :: SeatArrangement sc 'Registered
-  -- | Accepts more reservations and removals
-  SeatArrangementProposable   :: Reservations sc -> SeatArrangement sc 'Proposable
-  -- | Reservations no longer accepted, collecting proposals 
-  SeatArrangementSolicitable  :: Reservations sc -> SeatArrangement sc 'Solicitable
+  SeatArrangementInitialised :: SeatArrangement sc 'Initialised
+  -- | Register/unregister reservations
+  SeatArrangementRegistering :: Reservations sc -> SeatArrangement sc 'Registering
+  -- | Retrieving proposals 
+  SeatArrangementProposing   :: Reservations sc -> SeatArrangement sc 'Proposing
   -- | Assignment proposals available, accepting confirmations 
-  SeatArrangementAnnounceable :: Proposals sc -> ConfirmableAssignments sc -> SeatArrangement sc 'Announceable
-  -- | End of lifecycle
-  SeatArrangementBoarded      :: Assignments sc -> SeatArrangement sc 'Boarded
+  SeatArrangementConfirming  :: Proposals sc -> ConfirmableAssignments sc -> SeatArrangement sc 'Confirming
+  -- | All passengers are assigned a seat, commence boarding 
+  SeatArrangementBoarding    :: Assignments sc -> SeatArrangement sc 'Boarding
 
 
 data SomeSeatArrangement (lc :: SeatArrangementLifecycle) where
   SomeSeatArrangement :: KnownNat sc => SeatArrangement sc lc -> SomeSeatArrangement lc
 
 
-type SetReservationProblem = ReservationsProblem
+type RegisterReservationProblem = ReservationsProblem
 
--- | Add reservation to seat arrangement, applicable in 'Registered' and 'Proposable' phase
-class CanSetReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
-  setReservation :: Reservation -> SeatArrangement sc lc -> Either SetReservationProblem (SeatArrangement sc 'Proposable)
+-- | Register reservation to seat arrangement, applicable in 'Initialised' and 'Registering' phase
+class CanRegisterReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
+  register :: Reservation -> SeatArrangement sc lc -> Either RegisterReservationProblem (SeatArrangement sc 'Registering)
 
 
-data RemoveReservationResult (sc :: Nat)
-  = RegisteredAfterRemoval (SeatArrangement sc 'Registered)
-  | ProposableAfterRemoval (SeatArrangement sc 'Proposable)
+data UnregisterReservationResult (sc :: Nat)
+  = RegisteredAfterRemoval (SeatArrangement sc 'Initialised)
+  | ProposableAfterRemoval (SeatArrangement sc 'Registering)
 
--- | Removes reservation from seat arrangement, applicable in 'Proposable' phase
+-- | Unregisters reservation from seat arrangement, applicable in 'Registering' phase
 -- 
--- /note that it can transitition to 'Registered' phase, when no reservations are present after removal/
-class CanRemoveReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
-  removeReservation :: ReservationId -> SeatArrangement sc lc -> RemoveReservationResult sc
+-- /note that it can transitition to 'Initialised' phase, when no reservations are present after removal/
+class CanUnregisterReservation (sc :: Nat) (lc :: SeatArrangementLifecycle) where
+  unregisterReservation :: ReservationId -> SeatArrangement sc lc -> UnregisterReservationResult sc
 
 
--- * Operations related to 'Registered' phase
+-- * Operations related to 'Initialised' phase
 -- | Creates an empty 'SeatArrangement', based on the 'NumberOfSeats'
-mkSeatArrangement :: NumberOfSeats -> SomeSeatArrangement 'Registered
-mkSeatArrangement numberOfSeats =
+initialise :: NumberOfSeats -> SomeSeatArrangement 'Initialised
+initialise numberOfSeats =
   case seatCapacity numberOfSeats of 
-    SomeNat (Proxy :: Proxy sc) -> SomeSeatArrangement (SeatArrangementRegistered @sc)
+    SomeNat (Proxy :: Proxy sc) -> SomeSeatArrangement (SeatArrangementInitialised @sc)
 
-instance KnownNat sc => CanSetReservation sc 'Registered where
-  setReservation reservation SeatArrangementRegistered = 
+instance KnownNat sc => CanRegisterReservation sc 'Initialised where
+  register reservation SeatArrangementInitialised = 
     case refine (Set.singleton reservation) of
       Left exception      -> Left (parseReservationsProblem exception)
-      Right reservations' -> Right (SeatArrangementProposable reservations')
+      Right reservations' -> Right (SeatArrangementRegistering reservations')
 
 
--- * Operations related to 'Proposable' phase
-instance KnownNat sc => CanSetReservation sc 'Proposable where
-  setReservation reservation (SeatArrangementProposable reservations) = 
+-- * Operations related to 'Registering' phase
+instance KnownNat sc => CanRegisterReservation sc 'Registering where
+  register reservation (SeatArrangementRegistering reservations) = 
     case rerefine (Set.insert reservation) reservations of
       Left exception      -> Left (parseReservationsProblem exception)
-      Right reservations' -> Right (SeatArrangementProposable reservations')
+      Right reservations' -> Right (SeatArrangementRegistering reservations')
 
 
-instance KnownNat sc => CanRemoveReservation sc 'Proposable where
-  removeReservation reservation (SeatArrangementProposable (Refined reservations)) = 
+instance KnownNat sc => CanUnregisterReservation sc 'Registering where
+  unregisterReservation reservation (SeatArrangementRegistering (Refined reservations)) = 
     case refine reservations' of
-      Left _               -> RegisteredAfterRemoval SeatArrangementRegistered
-      Right reservations'' -> ProposableAfterRemoval (SeatArrangementProposable reservations'')
+      Left _               -> RegisteredAfterRemoval SeatArrangementInitialised
+      Right reservations'' -> ProposableAfterRemoval (SeatArrangementRegistering reservations'')
     where 
       reservations' = Set.filter (not . match) reservations
       match (Reservation id' _) = reservation == id'
 
--- | Ends 'Proposable' phase, collecting proposals 
-solicit :: KnownNat sc => SeatArrangement sc 'Proposable -> SeatArrangement sc 'Solicitable
-solicit (SeatArrangementProposable reservations) = SeatArrangementSolicitable reservations
+-- | Ends 'Registering' phase, retrieving proposals 
+propose :: KnownNat sc => SeatArrangement sc 'Registering -> SeatArrangement sc 'Proposing
+propose (SeatArrangementRegistering reservations) = SeatArrangementProposing reservations
 
--- * Operations related to 'Solicitable' phase
-data ParseProposalProblem 
+-- * Operations related to 'Proposing' phase
+data ProposalProblem 
   = ProposalDoesNotCoverAllReservations
   deriving stock (Eq, Ord)
 
--- | Parses proposals to 'SeatArrangement', on success the lifecycle transitions to 'Announceable'
-parseProposals :: KnownNat sc => Proposals sc -> SeatArrangement sc 'Solicitable -> Either ParseProposalProblem (SeatArrangement sc 'Announceable)
-parseProposals proposals (SeatArrangementSolicitable reservations) 
+-- | Parses proposals to 'SeatArrangement', on success the lifecycle transitions to 'Confirming'
+parseProposals :: KnownNat sc => Proposals sc -> SeatArrangement sc 'Proposing -> Either ProposalProblem (SeatArrangement sc 'Confirming)
+parseProposals proposals (SeatArrangementProposing reservations) 
   | Just problem <- headLeft problems = Left problem
-  | Right assignments <- refine confirmableAssignments = Right (SeatArrangementAnnounceable proposals assignments)
+  | Right assignments <- refine confirmableAssignments = Right (SeatArrangementConfirming proposals assignments)
   | otherwise = Left ProposalDoesNotCoverAllReservations
   where
     confirmableAssignments = foldr (\passenger -> Bimap.insert passenger UnassignedSeat) Bimap.empty passengers
@@ -133,7 +132,7 @@ parseProposals proposals (SeatArrangementSolicitable reservations)
     problems = Set.map (parseProposalForReservations reservations) (unrefine proposals)
 
 
-parseProposalForReservations :: KnownNat sc => Reservations sc -> Proposal sc -> Either ParseProposalProblem (Proposal sc)
+parseProposalForReservations :: KnownNat sc => Reservations sc -> Proposal sc -> Either ProposalProblem (Proposal sc)
 parseProposalForReservations (Refined reservations) proposal@(Refined assignments)
   | all covered reservations = Right proposal
   | otherwise = Left ProposalDoesNotCoverAllReservations
@@ -141,15 +140,15 @@ parseProposalForReservations (Refined reservations) proposal@(Refined assignment
     covered = all (`Bimap.member` assignments) . passengersOfReservation
 
 
--- * Operations related to 'Announcable' phase
+-- * Operations related to 'Confirming' phase
 data ProposalsForReservationProblem
   = ProposalsForReservationNotFound
   | ProposalsForReservationCorrupt
   deriving stock (Eq, Ord)
 
 -- | Get available propoals for a specific reservation
-proposalsForReservation :: KnownNat ps => ReservationId -> SeatArrangement sc 'Announceable -> Either ProposalsForReservationProblem (Proposals ps)
-proposalsForReservation id' (SeatArrangementAnnounceable proposals assignments) 
+proposalsForReservation :: KnownNat ps => ReservationId -> SeatArrangement sc 'Confirming -> Either ProposalsForReservationProblem (Proposals ps)
+proposalsForReservation id' (SeatArrangementConfirming proposals assignments) 
   | Just reservation@(Reservation _ (Refined passengers)) <- findReservationInProposals id' proposals = 
       case sequenceSet (Set.map (proposalForReservation reservation) availableProposals) of
         Left problem -> Left problem
@@ -182,14 +181,14 @@ data ConfirmProblem
   | ConfirmProposalAssignmentProblem AssignmentsProblem
 
 -- | Confirm seat assignments of reservation
-confirm :: (KnownNat ps, KnownNat sc) => ReservationId -> Proposal ps -> SeatArrangement sc 'Announceable -> Either ConfirmProblem (SeatArrangement sc 'Announceable) 
-confirm reservation reservationAssignments@(Refined passengerAssignments) arrangement@(SeatArrangementAnnounceable proposals (Refined confirmableAssignments))
+confirm :: (KnownNat ps, KnownNat sc) => ReservationId -> Proposal ps -> SeatArrangement sc 'Confirming -> Either ConfirmProblem (SeatArrangement sc 'Confirming) 
+confirm reservation reservationAssignments@(Refined passengerAssignments) arrangement@(SeatArrangementConfirming proposals (Refined confirmableAssignments))
   | not isAvailable = Left ConfirmProposalNotAvailable
   | assignmentsOverlap = Left ConfirmProposalAssignmentsOverlap
   | otherwise =  
     case refine confirmableAssignments' of
       Left exception                 -> Left . ConfirmProposalAssignmentProblem $ parseAssignmentsProblem exception
-      Right confirmableAssignments'' -> Right (SeatArrangementAnnounceable proposals confirmableAssignments'')
+      Right confirmableAssignments'' -> Right (SeatArrangementConfirming proposals confirmableAssignments'')
   where 
     assignmentsOverlap = 
       Bimap.size confirmableAssignments /= Bimap.size confirmableAssignments'
@@ -205,8 +204,7 @@ confirm reservation reservationAssignments@(Refined passengerAssignments) arrang
         Right (Refined availableProposals) -> Set.member reservationAssignments availableProposals
 
 
--- * Operations related to 'Boarable' phase
-
+-- * Operations related to 'Boarding' phase
 data BoardingProblem 
   = BoardingDisallowsUnassignedSeats
   deriving stock (Eq, Ord)
@@ -214,12 +212,12 @@ data BoardingProblem
 -- | Start boarding
 -- 
 -- /Precondition: all seats needs to assigned/
-board :: KnownNat sc => SeatArrangement sc 'Announceable -> Either BoardingProblem (SeatArrangement sc 'Boarded)
-board (SeatArrangementAnnounceable _ assignments)
+board :: KnownNat sc => SeatArrangement sc 'Confirming -> Either BoardingProblem (SeatArrangement sc 'Boarding)
+board (SeatArrangementConfirming _ assignments)
   | Bimap.null unconfirmedAssignments = 
       case refine confirmedAssignments of
         Left _          -> Left BoardingDisallowsUnassignedSeats
-        Right confirmed -> Right (SeatArrangementBoarded   confirmed)
+        Right confirmed -> Right (SeatArrangementBoarding   confirmed)
   | otherwise = Left BoardingDisallowsUnassignedSeats
   where 
     (confirmedAssignments, unconfirmedAssignments) = partitionConfirmableAssignments assignments
