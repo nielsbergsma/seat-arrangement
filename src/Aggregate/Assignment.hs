@@ -1,7 +1,7 @@
 module Aggregate.Assignment
   ( Assignments
   , ConfirmableAssignments
-  , AssignmentsProblem
+  , AssignmentsProblem(..)
 
   -- operations
   , parseAssignmentsProblem

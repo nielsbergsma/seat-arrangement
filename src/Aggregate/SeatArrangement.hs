@@ -43,18 +43,24 @@ import Aggregate.Reservation (Reservations, Reservation(..), ReservationId, Pass
 import Extension.Refined (pattern Refined, refine, rerefine, unrefine)
 
 
-data SeatArrangementLifecycle = Initialising | Registering | Proposing | Confirming | Boarding
+data SeatArrangementLifecycle 
+  -- | Initialise lifecycle, when a flight is scheduled, accepts reservations
+  = Initialising 
+  -- | Register/unregister reservations
+  | Registering 
+  -- | Retrieving proposals 
+  | Proposing 
+  -- | Assignment proposals available, accepting confirmations 
+  | Confirming 
+  -- | All passengers are assigned a seat, commence boarding 
+  | Boarding
+
 
 data SeatArrangement (sc :: Nat) (lc :: SeatArrangementLifecycle) where
-  -- | Initialise lifecycle, when a flight is scheduled, accepts reservations
   SeatArrangementInitialising :: SeatArrangement sc 'Initialising
-  -- | Register/unregister reservations
   SeatArrangementRegistering  :: Reservations sc -> SeatArrangement sc 'Registering
-  -- | Retrieving proposals 
   SeatArrangementProposing    :: Reservations sc -> SeatArrangement sc 'Proposing
-  -- | Assignment proposals available, accepting confirmations 
   SeatArrangementConfirming   :: Proposals sc -> ConfirmableAssignments sc -> SeatArrangement sc 'Confirming
-  -- | All passengers are assigned a seat, commence boarding 
   SeatArrangementBoarding     :: Assignments sc -> SeatArrangement sc 'Boarding
 
 
@@ -70,8 +76,8 @@ class CanRegister (sc :: Nat) (lc :: SeatArrangementLifecycle) where
 
 
 data UnregisterResult (sc :: Nat)
-  = InitialisingAfterRemoval (SeatArrangement sc 'Initialising)
-  | RegsteringAfterRemoval (SeatArrangement sc 'Registering)
+  = InitialisingAfterUnregister (SeatArrangement sc 'Initialising)
+  | RegsteringAfterUnregister (SeatArrangement sc 'Registering)
 
 -- | Unregisters reservation from seat arrangement, applicable in 'Registering' phase
 -- 
@@ -105,8 +111,8 @@ instance KnownNat sc => CanRegister sc 'Registering where
 instance KnownNat sc => CanUnregister sc 'Registering where
   unregister reservation (SeatArrangementRegistering (Refined reservations)) = 
     case refine reservations' of
-      Left _               -> InitialisingAfterRemoval SeatArrangementInitialising
-      Right reservations'' -> RegsteringAfterRemoval (SeatArrangementRegistering reservations'')
+      Left _               -> InitialisingAfterUnregister SeatArrangementInitialising
+      Right reservations'' -> RegsteringAfterUnregister (SeatArrangementRegistering reservations'')
     where 
       reservations' = Set.filter (not . match) reservations
       match (Reservation id' _) = reservation == id'
