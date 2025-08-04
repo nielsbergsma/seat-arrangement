@@ -44,7 +44,7 @@ import Extension.Refined (pattern Refined, refine, rerefine, unrefine)
 
 
 data SeatArrangementLifecycle 
-  -- | Initialise lifecycle, when a flight is scheduled, accepts reservations
+  -- | Initialise empty seat arrangement, typically when a flight is scheduled, accepts registering reservations
   = Initialising 
   -- | Register/unregister reservations
   | Registering 
@@ -52,7 +52,7 @@ data SeatArrangementLifecycle
   | Proposing 
   -- | Assignment proposals available, accepting confirmations 
   | Confirming 
-  -- | All passengers are assigned a seat, commence boarding 
+  -- | All passengers are assigned a seat, prepare boarding 
   | Boarding
 
 
@@ -186,7 +186,7 @@ data ConfirmProblem
   | ConfirmProposalAssignmentsOverlap
   | ConfirmProposalAssignmentProblem AssignmentsProblem
 
--- | Confirm seat assignments of reservation
+-- | Confirm seat assignments of a specific reservation
 confirm :: (KnownNat ps, KnownNat sc) => ReservationId -> Proposal ps -> SeatArrangement sc 'Confirming -> Either ConfirmProblem (SeatArrangement sc 'Confirming) 
 confirm reservation reservationAssignments@(Refined passengerAssignments) arrangement@(SeatArrangementConfirming proposals (Refined confirmableAssignments))
   | not isAvailable = Left ConfirmProposalNotAvailable
@@ -215,9 +215,9 @@ data BoardProblem
   = BoardNotAllowedWithUnassignedSeats
   deriving stock (Eq, Ord)
 
--- | Start boarding
+-- | Prepare boarding
 -- 
--- /Precondition: all seats needs to assigned/
+-- /Precondition: all passengers needs to be assigned to a seat/
 board :: KnownNat sc => SeatArrangement sc 'Confirming -> Either BoardProblem (SeatArrangement sc 'Boarding)
 board (SeatArrangementConfirming _ assignments)
   | Bimap.null unconfirmedAssignments = 
