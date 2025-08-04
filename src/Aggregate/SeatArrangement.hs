@@ -14,7 +14,7 @@ module Aggregate.SeatArrangement
   , propose
 
   -- * Operations related to 'Proposing' phase
-  , ParseProposalProblem(..)
+  , ProposalProblem(..)
   , parseProposals
 
   -- * Operations related to 'Confirming' phase
@@ -116,26 +116,26 @@ propose :: KnownNat sc => SeatArrangement sc 'Registering -> SeatArrangement sc 
 propose (SeatArrangementRegistering reservations) = SeatArrangementProposing reservations
 
 -- * Operations related to 'Proposing' phase
-data ParseProposalProblem 
-  = ParsedProposalDoesNotCoverAllReservations
+data ProposalProblem 
+  = ProposalDoesNotCoverAllReservations
   deriving stock (Eq, Ord)
 
 -- | Parses proposals to 'SeatArrangement', on success the lifecycle transitions to 'Confirming'
-parseProposals :: KnownNat sc => Proposals sc -> SeatArrangement sc 'Proposing -> Either ParseProposalProblem (SeatArrangement sc 'Confirming)
+parseProposals :: KnownNat sc => Proposals sc -> SeatArrangement sc 'Proposing -> Either ProposalProblem (SeatArrangement sc 'Confirming)
 parseProposals proposals (SeatArrangementProposing reservations) 
   | Just problem <- headLeft problems = Left problem
   | Right assignments <- refine confirmableAssignments = Right (SeatArrangementConfirming proposals assignments)
-  | otherwise = Left ParsedProposalDoesNotCoverAllReservations
+  | otherwise = Left ProposalDoesNotCoverAllReservations
   where
     confirmableAssignments = foldr (\passenger -> Bimap.insert passenger UnassignedSeat) Bimap.empty passengers
     passengers = Set.unions (Set.map passengersOfReservation (unrefine reservations))
     problems = Set.map (parseProposalForReservations reservations) (unrefine proposals)
 
 
-parseProposalForReservations :: KnownNat sc => Reservations sc -> Proposal sc -> Either ParseProposalProblem (Proposal sc)
+parseProposalForReservations :: KnownNat sc => Reservations sc -> Proposal sc -> Either ProposalProblem (Proposal sc)
 parseProposalForReservations (Refined reservations) proposal@(Refined assignments)
   | all covered reservations = Right proposal
-  | otherwise = Left ParsedProposalDoesNotCoverAllReservations
+  | otherwise = Left ProposalDoesNotCoverAllReservations
   where 
     covered = all (`Bimap.member` assignments) . passengersOfReservation
 
