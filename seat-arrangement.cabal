@@ -50,13 +50,28 @@ test-suite spec
     type:                exitcode-stdio-1.0
     hs-source-dirs:      test
     main-is:             Spec.hs
+
+    other-modules:
+        Aggregate.SeatSpec
+        Aggregate.ReservationSpec
+        Aggregate.AssignmentSpec
+        Aggregate.ProposalSpec
+        Aggregate.SeatArrangementSpec
+
+    default-extensions:
+        OverloadedStrings
+        ViewPatterns
+        PatternSynonyms
+        ImportQualifiedPost
+        GADTs
+
     build-depends:
         base >=4.14 && <5,
         tasty,
         tasty-hunit,
         seat-arrangement,
-        bytestring,
-        base64-bytestring,
-        mtl
+        containers,
+        bimap,
+        uuid
     
     default-language:    GHC2024

@@ -15,6 +15,7 @@ import Data.Text (Text, pack)
 import Data.Maybe (fromMaybe)
 import Data.Bimap (Bimap)
 import Data.Bimap qualified as Bimap
+import Extension.Data (maximumTotal)
 
 import Constraint (BoundedSeatNumber, SeatCapacity)
 import Extension.Refined (Refined, pattern Refined, Predicate(..), RefineException, type (&&), parseSomeException, throwRefineSomeException, success, unrefine)
@@ -23,10 +24,10 @@ import Aggregate.Reservation (Passenger)
 import Aggregate.Seat (Seat, AssignableSeat(..))
 
 
-type Assignments (sc :: Nat) = Refined (BoundedSeatNumber sc && SeatCapacity sc) (Bimap Passenger Seat)
+type Assignments (sc :: Nat) = Refined (SeatCapacity sc && BoundedSeatNumber sc) (Bimap Passenger Seat)
 
 
-type ConfirmableAssignments (sc :: Nat) = Refined (BoundedSeatNumber sc && SeatCapacity sc) (Bimap Passenger AssignableSeat)
+type ConfirmableAssignments (sc :: Nat) = Refined (SeatCapacity sc && BoundedSeatNumber sc) (Bimap Passenger AssignableSeat)
 
 
 -- operations
@@ -43,10 +44,9 @@ partitionConfirmableAssignments (Refined assignments) =
 data AssignmentsProblem 
   = AssignmentsIsEmpty
   | AssignmentsExceedSeatCapacity
-  | AssignmentsContainDuplicateSeats
   | AssignmentsContainOutOfRangeSeat
   | AssignmentsCorrupt Text
-  deriving stock (Show)
+  deriving stock (Eq, Show)
   deriving anyclass (Exception)
 
 
@@ -70,20 +70,22 @@ instance KnownNat sc => Predicate (SeatCapacity sc) (Bimap Passenger s) where
 
 instance KnownNat sc => Predicate (BoundedSeatNumber sc) (Bimap Passenger Seat) where
   validate p assignments 
-    | maxSeatNumber < seatCapacity = success
+    | maxSeatNumber < Just seatCapacity = success
     | otherwise = throwRefineSomeException (typeRep p) (toException AssignmentsContainOutOfRangeSeat)
     where 
-      maxSeatNumber = maximum (unrefine <$> Bimap.elems assignments)
+      maxSeatNumber = maximumTotal (unrefine <$> Bimap.elems assignments)
       seatCapacity = fromInteger (natVal (Proxy @sc))
 
 
 instance KnownNat sc => Predicate (BoundedSeatNumber sc) (Bimap Passenger AssignableSeat) where
   validate p assignments 
-    | seatNumberMax < seatCapacity = success
+    | seatNumberMax < Just seatCapacity = success
     | otherwise = throwRefineSomeException (typeRep p) (toException AssignmentsContainOutOfRangeSeat)
     where 
-      seatNumberMax = maximum (assignableSeatToInt <$> Bimap.elems assignments)
+      seatNumberMax = maximumTotal (assignableSeatToMax <$> Bimap.elems assignments)
       seatCapacity = fromInteger (natVal (Proxy @sc))
 
-      assignableSeatToInt UnassignedSeat = 0
-      assignableSeatToInt (AssignedSeat (Refined seatNumber)) = seatNumber
+      assignableSeatToMax UnassignedSeat = 0
+      assignableSeatToMax (AssignedSeat (Refined seatNumber)) = seatNumber
+
+

@@ -1,5 +1,6 @@
 module Aggregate.Reservation
   ( NumberOfPassengers
+  , ReservationIdProblem(..)
   , ReservationId(..)
   , Reservation(..)
   , Reservations
@@ -7,6 +8,7 @@ module Aggregate.Reservation
   , Passenger(..)
   
   -- operations
+  , parseReservationId
   , passengersOfReservation
   , parseReservationsProblem
   ) where
@@ -21,20 +23,33 @@ import Data.Set qualified as Set
 import Data.UUID (UUID)
 
 import Constraint (NotEmpty, SeatCapacity)
-import Extension.Refined (Refined, pattern Refined, RefineException, Predicate(..), FromTo, type (&&), success, unrefine, parseSomeException, throwRefineSomeException)
+import Extension.Refined (Refined, pattern Refined, RefineException, Predicate(..), FromTo, type (&&), success, refine, unrefine, parseSomeException, throwRefineSomeException)
 
 
 type NumberOfPassengers = Refined (FromTo 1 256) Int
 
+data ReservationIdProblem 
+  = ReservationIdIsEmpty
+  deriving stock (Eq, Show)
+  deriving anyclass (Exception)
+
 
 newtype ReservationId = ReservationId (Refined NotEmpty UUID)
-  deriving stock (Eq, Ord)
+  deriving stock (Eq, Ord, Show)
+
+
+parseReservationId :: UUID -> Either ReservationIdProblem ReservationId
+parseReservationId value = 
+  case refine value of
+    Left _ -> Left ReservationIdIsEmpty
+    Right id' -> Right (ReservationId id')
 
 
 data Reservation = Reservation
   { reservationId :: ReservationId
   , reservationPassengers :: NumberOfPassengers
   }
+  deriving stock (Show)
 
 instance Eq Reservation where
   (==) lhs rhs = lhs.reservationId == rhs.reservationId
@@ -44,7 +59,7 @@ instance Ord Reservation where
 
 
 data Passenger = Passenger ReservationId Int
-  deriving stock (Eq, Ord)
+  deriving stock (Eq, Ord, Show)
 
 
 type Reservations (sc :: Nat) = Refined (NotEmpty && SeatCapacity sc) (Set Reservation)
@@ -58,10 +73,9 @@ passengersOfReservation (Reservation id' (Refined passengers)) =
 -- invariants
 data ReservationsProblem
   = ReservationsIsEmpty
-  | ReservationsHasNoPassenger
   | ReservationsExceedSeatCapacity
   | ReservationsCorrupt Text
-  deriving stock (Show)
+  deriving stock (Eq, Show)
   deriving anyclass (Exception)
 
 -- | Parse 'RefineException' to 'ReservationsProblem', falls back to 'ReservationsCorrupt'
@@ -81,7 +95,6 @@ instance Predicate NotEmpty (Set Reservation) where
 instance KnownNat sc => Predicate (SeatCapacity sc) (Set Reservation) where
   validate p reservations
     | passengerCount > 0 && passengerCount <= seatCapacity = success
-    | passengerCount == 0 = throwRefineSomeException (typeRep p) (toException ReservationsHasNoPassenger)
     | otherwise = throwRefineSomeException (typeRep p) (toException ReservationsExceedSeatCapacity)
     where 
       passengerCount = foldr ((+) . unrefine . reservationPassengers) 0 reservations

@@ -20,6 +20,7 @@ type NumberOfSeats = Refined (FromTo 1 256) Int
 
 
 data AssignableSeat = UnassignedSeat | AssignedSeat Seat
+  deriving stock (Show)
 
 instance Eq AssignableSeat where
   (==) (AssignedSeat lhs) (AssignedSeat rhs) = lhs == rhs

@@ -25,7 +25,7 @@ type Proposals (sc :: Nat) = Refined NotEmpty (Set (Proposal sc))
 -- invariants
 data ProposalsProblem
   = ProposalsIsEmpty
-  deriving stock (Show)
+  deriving stock (Eq, Show)
   deriving anyclass (Exception)
 
 instance KnownNat sc => Predicate NotEmpty (Set (Proposal sc)) where
