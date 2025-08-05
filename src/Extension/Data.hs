@@ -6,9 +6,9 @@ module Extension.Data
   ) where
 
 import Data.Set (Set)
-import qualified Data.Set as Set  
-import qualified Data.Either as Either
-import qualified Data.Foldable as Foldable
+import Data.Set qualified as Set  
+import Data.Either qualified as Either
+import Data.Foldable qualified as Foldable
 
 
 headLeft :: (Foldable t) => t (Either l r) -> Maybe l
@@ -30,5 +30,5 @@ sequenceSet =
 
 maximumTotal :: (Foldable t, Ord a) => t a -> Maybe a
 maximumTotal items
-  | Foldable.null items = Nothing
+  | null items = Nothing
   | otherwise = Just (maximum items)

@@ -88,7 +88,7 @@ parseReservationsProblem exception =
 
 instance Predicate NotEmpty (Set Reservation) where
   validate p reservations
-    | not (Set.null reservations) = success
+    | not (null reservations) = success
     | otherwise = throwRefineSomeException (typeRep p) (toException ReservationsIsEmpty)
 
 

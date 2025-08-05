@@ -33,7 +33,7 @@ tests = testGroup "Assignment tests"
   ]
 
 
-testAssignments = testCase "Assignments happy path" $ do
+testAssignments = testCase "Assignments must initialise with assignments" $ do
   expectRight actual
   where
     actual = refine assignments :: Either RefineException (Assignments 2)
@@ -71,7 +71,7 @@ testAssignmentsBoundedSeats = testCase "Assignments seats must be between 0 and 
       ]
 
 
-testConfirmableAssignments = testCase "ConfirmableAssignments happy path" $ do
+testConfirmableAssignments = testCase "ConfirmableAssignments must initialise with assignable seats" $ do
   expectRight actual
   where
     actual = refine assignments :: Either RefineException (ConfirmableAssignments 2)
@@ -99,7 +99,7 @@ testConfirmableAssignmentsSeatCapacity = testCase "ConfirmableAssignments must b
       ]
 
 
-testConfirmableAssignmentsUnassigned = testCase "ConfirmableAssignments multiple unassigned seats allowed" $ do
+testConfirmableAssignmentsUnassigned = testCase "ConfirmableAssignments must allow multiple unassigned seats" $ do
   expectRight actual
   where
     actual = refine assignments :: Either RefineException (ConfirmableAssignments 3)
@@ -111,7 +111,7 @@ testConfirmableAssignmentsUnassigned = testCase "ConfirmableAssignments multiple
       ]
 
 
-testConfirmableAssignmentsBoundedSeats = testCase "ConfirmableAssignments seats must be between 0 and sc" $ do
+testConfirmableAssignmentsBoundedSeats = testCase "ConfirmableAssignments must only allow seat numbers be between 0 and sc" $ do
   expectLeftProblem AssignmentsContainOutOfRangeSeat actual
   where
     actual = refine assignments :: Either RefineException (ConfirmableAssignments 2)
@@ -121,7 +121,7 @@ testConfirmableAssignmentsBoundedSeats = testCase "ConfirmableAssignments seats 
       ]
 
 
-testPartitionConfirmableAssignments = testCase "partitionConfirmableAssignments partitions assignments in assigned/unassigned" $ do
+testPartitionConfirmableAssignments = testCase "partitionConfirmableAssignments must partition assignments in assigned/unassigned" $ do
   assigned @?= Bimap.fromList [assignment1', assignment2']
   Bimap.keys unassigned @?= [assignment3', assignment4']
   where
@@ -133,9 +133,9 @@ testPartitionConfirmableAssignments = testCase "partitionConfirmableAssignments 
     assignment2  = (mkPassenger "9ef6ed10-39ed-46c1-9fe6-4acb6c9e5124" 1, AssignedSeat (mkSeat 2))
     assignment2' = (mkPassenger "9ef6ed10-39ed-46c1-9fe6-4acb6c9e5124" 1, mkSeat 2)
     assignment3  = (mkPassenger "54cc195c-df77-4b81-b561-23f8b66872cf" 0, UnassignedSeat)
-    assignment3' = mkPassenger "54cc195c-df77-4b81-b561-23f8b66872cf" 0
+    assignment3' = (mkPassenger "54cc195c-df77-4b81-b561-23f8b66872cf" 0)
     assignment4  = (mkPassenger "54cc195c-df77-4b81-b561-23f8b66872cf" 1, UnassignedSeat)
-    assignment4' = mkPassenger "54cc195c-df77-4b81-b561-23f8b66872cf" 1
+    assignment4' = (mkPassenger "54cc195c-df77-4b81-b561-23f8b66872cf" 1)
 
 
 -- generators

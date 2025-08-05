@@ -69,6 +69,7 @@ testRegisterRegisteringSeatCapacity = testCase "SeatArrangement cannot register 
 -- unregister
 -- propose
 -- parseProposals
+-- proposalsForReservation
 -- confirm
 -- board
 

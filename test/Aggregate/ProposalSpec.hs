@@ -27,7 +27,7 @@ tests = testGroup "Proposal tests"
   ]
 
 
-testProposal = testCase "Proposal happy path" $ do
+testProposal = testCase "Proposal must initialise with assignments" $ do
   expectRight actual
   where
     actual = refine assignments :: Either RefineException (Proposal 2)
@@ -38,7 +38,7 @@ testProposal = testCase "Proposal happy path" $ do
       ]
 
 
-testProposals = testCase "Proposals happy path" $ do
+testProposals = testCase "Proposals must initialise with a set of assignments" $ do
   expectRight proposals
   where
     proposals = refine (Set.fromList [proposal1]) :: Either RefineException (Proposals 2)

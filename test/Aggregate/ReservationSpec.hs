@@ -26,7 +26,7 @@ tests = testGroup "Reservation tests"
   ]
 
 
-testNumberOfPassengers = testCase "NumberOfPassengers ranges between 1 and 256" $ do
+testNumberOfPassengers = testCase "NumberOfPassengers must range between 1 and 256" $ do
   expectRight (parseNumberOfSeats 1)
   expectRight (parseNumberOfSeats 256)
   expectLeft (parseNumberOfSeats 0)
@@ -42,13 +42,13 @@ testReservationId = testCase "ReservationId must be non-empty" $ do
     invalidId = UUID.nil
 
 
-testReservationIdEquality = testCase "ReservationId can establish equality" $ do
+testReservationIdEquality = testCase "ReservationId must be equal by value" $ do
   expectOrdEqual reservationId1 reservationId1
   where 
     Right reservationId1 = parseReservationId (uuidFromString "8dbde54e-ed7e-4449-bc38-7da529de5603")
 
 
-testReservationPassengers = testCase "Reservation can output its passengers" $ do
+testReservationPassengers = testCase "Reservation must be able to export its passengers" $ do
   passengersOfReservation reservation @?= Set.fromList [Passenger reservationId 1, Passenger reservationId 2]
   where 
     reservation = mkReservation "8dbde54e-ed7e-4449-bc38-7da529de5603" 2
@@ -61,7 +61,7 @@ testReservationsNotEmpty = testCase "Reservations must be non-empty" $ do
     reservations = refine Set.empty :: Either RefineException (Reservations 2)
 
 
-testReservationsSeatCapacity = testCase "Reservations passengers must not exceed seat capacity" $ do
+testReservationsSeatCapacity = testCase "Reservations must not exceed seat capacity" $ do
   expectRight (parse reservationOf1)
   expectRight (parse reservationOf2)
   expectLeftProblem ReservationsExceedSeatCapacity (parse reservationOf3)

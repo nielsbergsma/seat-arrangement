@@ -20,7 +20,7 @@ tests = testGroup "Seat tests"
   , testSeatCapacity
   ]
 
-testSeat = testCase "Seat ranges between 0 and 256" $ do
+testSeat = testCase "Seat must range between 0 and 256" $ do
   expectRight (parseSeat 0)
   expectRight (parseSeat 256)
   expectLeft (parseSeat (-1))
@@ -29,7 +29,7 @@ testSeat = testCase "Seat ranges between 0 and 256" $ do
     parseSeat value = refine value :: Either RefineException Seat
     
 
-testNumberOfSeats = testCase "NumberOfSeats ranges between 1 and 256" $ do
+testNumberOfSeats = testCase "NumberOfSeats must range between 1 and 256" $ do
   expectRight (parseNumberOfSeats 1)
   expectRight (parseNumberOfSeats 256)
   expectLeft (parseNumberOfSeats 0)
@@ -38,7 +38,7 @@ testNumberOfSeats = testCase "NumberOfSeats ranges between 1 and 256" $ do
     parseNumberOfSeats value = refine value :: Either RefineException NumberOfSeats
     
 
-testAssignableSeatEquality = testCase "AssignableSeat is only equal for Assigned {Seat}" $ do
+testAssignableSeatEquality = testCase "AssignableSeat must only be equal for Assigned {Seat}" $ do
   expectOrdEqual (AssignedSeat seat1) (AssignedSeat seat1)
   expectNotOrdEqual (AssignedSeat seat1) (AssignedSeat seat2)
   expectNotOrdEqual (UnassignedSeat) (AssignedSeat seat1)
@@ -49,7 +49,7 @@ testAssignableSeatEquality = testCase "AssignableSeat is only equal for Assigned
     Right seat2 = refine 2 :: Either RefineException Seat
     
 
-testSeatCapacity = testCase "seatCapacity transforms NumberOfSeats to SomeNat" $ do
+testSeatCapacity = testCase "seatCapacity must transform NumberOfSeats to SomeNat" $ do
   seatCapacity numberOfSeats @?= expectedSeatCapacity
   where
     Right numberOfSeats = refine 25 :: Either RefineException NumberOfSeats

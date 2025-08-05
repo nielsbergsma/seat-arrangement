@@ -30,5 +30,5 @@ data ProposalsProblem
 
 instance KnownNat sc => Predicate NotEmpty (Set (Proposal sc)) where
   validate p proposals
-    | not (Set.null proposals) = success
+    | not (null proposals) = success
     | otherwise = throwRefineSomeException (typeRep p) (toException ProposalsIsEmpty)
