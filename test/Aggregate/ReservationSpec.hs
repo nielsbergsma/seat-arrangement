@@ -49,7 +49,7 @@ testReservationIdEquality = testCase "ReservationId must be equal by value" $ do
 
 
 testReservationPassengers = testCase "Reservation must be able to export its passengers" $ do
-  passengersOfReservation reservation @?= Set.fromList [Passenger reservationId 1, Passenger reservationId 2]
+  passengersOfReservation reservation @?= Set.fromList [Passenger reservationId 0, Passenger reservationId 1]
   where 
     reservation = mkReservation "8dbde54e-ed7e-4449-bc38-7da529de5603" 2
     reservationId = mkReservationId "8dbde54e-ed7e-4449-bc38-7da529de5603"

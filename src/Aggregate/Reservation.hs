@@ -67,7 +67,7 @@ type Reservations (sc :: Nat) = Refined (NotEmpty && SeatCapacity sc) (Set Reser
 -- | Create passengers from reservation
 passengersOfReservation :: Reservation -> Set Passenger
 passengersOfReservation (Reservation id' (Refined passengers)) = 
-  Set.fromList [Passenger id' p | p <- enumFromTo 1 passengers]
+  Set.fromList [Passenger id' p | p <- [0..passengers-1]]
 
 
 -- invariants

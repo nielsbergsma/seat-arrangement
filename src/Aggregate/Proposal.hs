@@ -21,7 +21,6 @@ type Proposal (sc :: Nat) = Assignments sc
 
 type Proposals (sc :: Nat) = Refined NotEmpty (Set (Proposal sc))
 
-
 -- invariants
 data ProposalsProblem
   = ProposalsIsEmpty
