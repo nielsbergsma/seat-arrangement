@@ -9,22 +9,18 @@ This repository demonstrates how to model and implement domain aggregates in Has
 
 The seat arrangement domain models the process of managing seat reservations and assignments for a set of passengers, such as on a train or airplane. It covers the full lifecycle from defining the available seats, registering reservations for groups of passengers, generating and confirming seat assignment proposals, and finally boarding. The system enforces business rules such as seat capacity limits, group adjacency, and prevents invalid or conflicting assignments, all using Haskell's type system to ensure correctness by construction.
 
-- **Aggregates**: Encapsulating business logic and maintaining consistency boundaries
-- **Type Safety**: Leveraging Haskell's type system to encode domain constraints
-- **Domain Modeling**: Expressing business invariants through types and functions
-
 ## Key Concepts
 
 - **Type-Driven Design**: Using Haskell's type system (GADTs, type families, view patterns) to model domain concepts
 - **Refined Types**: Encoding invariants directly in types to prevent invalid states at compile time
 - **Domain-Driven Design**: Aggregates, value objects, and business rules are modeled explicitly
 
-## Project Structure
+## Repository Structure
 
 - `src/Aggregate/` — Domain logic (Seat, Reservation, Assignment, Proposal, SeatArrangement)
 - `test/Aggregate/SeatArrangementSpec.hs` — Property and unit tests for aggregate logic
 
-## How It Works
+## Domain
 
 The aggregate models the lifecycle of a seat arrangement as a series of well-defined phases, each with its own rules and invariants. The transitions between these phases are enforced at the type level, ensuring that only valid operations are possible at any given stage. Here is a breakdown of the process:
 
