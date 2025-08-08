@@ -11,7 +11,8 @@ module Aggregate.Assignment
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import Control.Exception.Base (Exception, fromException, toException)
 import Data.Typeable (Proxy(..), typeRep)
-import Data.Text (Text, pack)
+import Data.Text (Text)
+import Data.Text qualified as Text
 import Data.Maybe (fromMaybe)
 import Data.Bimap (Bimap)
 import Data.Bimap qualified as Bimap
@@ -54,7 +55,7 @@ data AssignmentsProblem
 parseAssignmentsProblem :: RefineException -> AssignmentsProblem
 parseAssignmentsProblem exception = 
   fromMaybe 
-    (AssignmentsCorrupt (pack (show exception)))
+    (AssignmentsCorrupt (Text.show exception))
     (parseSomeException exception >>= fromException)
 
 

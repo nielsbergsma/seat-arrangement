@@ -24,12 +24,13 @@ module Aggregate.SeatArrangement
   , confirm
 
   -- * Operations related to 'Boarding' phase
-  , PrepareBoardingProblem(..)
-  , prepareBoarding
+  , BoardProblem(..)
+  , board
   ) where 
 
 import GHC.TypeLits (Nat, KnownNat, SomeNat(..))
-import Data.Text (Text, pack)
+import Data.Text (Text)
+import Data.Text qualified as Text
 import Data.Typeable (Proxy(..))
 import Data.Set qualified as Set
 import Data.Bimap (Bimap)
@@ -73,6 +74,7 @@ type RegisterProblem = ReservationsProblem
 
 -- | Register reservation to seat arrangement, applicable in 'Initialising' and 'Registering' phase
 class CanRegister (sc :: Nat) (lc :: SeatArrangementLifecycle) where
+  -- | /This is function is idempotent/
   register :: Reservation -> SeatArrangement sc lc -> Either RegisterProblem (SeatArrangement sc 'Registering)
 
 
@@ -97,7 +99,7 @@ initialise numberOfSeats =
 instance KnownNat sc => CanRegister sc 'Initialising where
   register reservation SeatArrangementInitialising = 
     case refine (Set.singleton reservation) of
-      Left reason         -> Left (parseReservationsProblem reason)
+      Left problem         -> Left (parseReservationsProblem problem)
       Right reservations' -> Right (SeatArrangementRegistering reservations')
 
 
@@ -105,7 +107,7 @@ instance KnownNat sc => CanRegister sc 'Initialising where
 instance KnownNat sc => CanRegister sc 'Registering where
   register reservation (SeatArrangementRegistering reservations) = 
     case rerefine (Set.insert reservation) reservations of
-      Left reason         -> Left (parseReservationsProblem reason)
+      Left problem         -> Left (parseReservationsProblem problem)
       Right reservations' -> Right (SeatArrangementRegistering reservations')
 
 
@@ -156,12 +158,12 @@ data ProposalsForReservationProblem
 -- | Get available propoals for a specific reservation
 proposalsForReservation :: KnownNat sc => ReservationId -> SeatArrangement sc 'Confirming -> Either ProposalsForReservationProblem (Proposals sc)
 proposalsForReservation id' (SeatArrangementConfirming proposals assignments) 
-  | Just reservation@(Reservation _ (Refined passengers)) <- findReservationInProposals id' proposals = 
+  | Just reservation <- findReservationInProposals id' proposals = 
       case sequenceSet (Set.map (proposalForReservation reservation) availableProposals) of
         Left problem -> Left problem
         Right reservationProposals -> 
           case refine reservationProposals of 
-            Left reason -> Left . ProposalsForReservationCorrupt . pack . show $ reason
+            Left problem -> Left . ProposalsForReservationCorrupt . Text.show $ problem
             Right reservationProposals' -> Right reservationProposals'
         
   | otherwise = Left ProposalsForReservationNotFound
@@ -176,7 +178,7 @@ proposalForReservation (Reservation id' (Refined passengers)) (Refined proposal)
   | Bimap.size assignments == passengers =
     case refine assignments of 
       Right assignments' -> Right assignments'
-      Left reason        -> Left . ProposalsForReservationCorrupt . pack . show $ reason
+      Left problem        -> Left . ProposalsForReservationCorrupt . Text.show $ problem
   | otherwise            =  Left ProposalsForReservationNotFound
   where
     assignments = Bimap.filter (isAssignmentOfReservation id') proposal
@@ -184,17 +186,19 @@ proposalForReservation (Reservation id' (Refined passengers)) (Refined proposal)
 
 data ConfirmProblem 
   = ConfirmProposalNotAvailable
-  | ConfirmProposalAssignmentsOverlap
   | ConfirmProposalAssignmentProblem AssignmentsProblem
+  deriving (Show, Eq)
 
 -- | Confirm seat assignments of a specific reservation
+--
+-- /This is function is idempotent/
 confirm :: KnownNat sc => ReservationId -> Proposal sc -> SeatArrangement sc 'Confirming -> Either ConfirmProblem (SeatArrangement sc 'Confirming) 
 confirm reservation reservationAssignments@(Refined passengerAssignments) arrangement@(SeatArrangementConfirming proposals (Refined confirmableAssignments))
   | not proposalIsAvailable = Left ConfirmProposalNotAvailable
-  | assignmentsOverlap = Left ConfirmProposalAssignmentsOverlap
+  | assignmentsOverlap = Left ConfirmProposalNotAvailable
   | otherwise =  
     case refine confirmableAssignments' of
-      Left reason                    -> Left . ConfirmProposalAssignmentProblem . parseAssignmentsProblem $ reason
+      Left problem                    -> Left . ConfirmProposalAssignmentProblem . parseAssignmentsProblem $ problem
       Right confirmableAssignments'' -> Right (SeatArrangementConfirming proposals confirmableAssignments'')
   where 
     assignmentsOverlap = 
@@ -212,20 +216,20 @@ confirm reservation reservationAssignments@(Refined passengerAssignments) arrang
 
 
 -- * Operations related to 'Boarding' phase
-data PrepareBoardingProblem 
-  = PrepareBoardingNotAllowedWithUnassignedSeats
-  deriving stock (Eq, Ord)
+data BoardProblem 
+  = BoardNotAllowedWithUnassignedSeats
+  deriving stock (Show, Eq, Ord)
 
 -- | Prepare boarding
 -- 
 -- /Precondition: all passengers needs to be assigned to a seat/
-prepareBoarding :: KnownNat sc => SeatArrangement sc 'Confirming -> Either PrepareBoardingProblem (SeatArrangement sc 'Boarding)
-prepareBoarding (SeatArrangementConfirming _ assignments)
+board :: KnownNat sc => SeatArrangement sc 'Confirming -> Either BoardProblem (SeatArrangement sc 'Boarding)
+board (SeatArrangementConfirming _ assignments)
   | Bimap.null unconfirmedAssignments = 
       case refine confirmedAssignments of
-        Left _          -> Left PrepareBoardingNotAllowedWithUnassignedSeats
+        Left _          -> Left BoardNotAllowedWithUnassignedSeats
         Right confirmed -> Right (SeatArrangementBoarding confirmed)
-  | otherwise = Left PrepareBoardingNotAllowedWithUnassignedSeats
+  | otherwise = Left BoardNotAllowedWithUnassignedSeats
   where 
     (confirmedAssignments, unconfirmedAssignments) = partitionConfirmableAssignments assignments
 

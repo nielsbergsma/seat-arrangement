@@ -23,26 +23,48 @@ import Aggregate.SeatArrangement
 
 tests :: TestTree
 tests = testGroup "SeatArrangement tests"
-  [ testInitialise
-  , testRegisterInitialised
-  , testRegisterInitialisedSeatCapacity
-  , testRegisterRegistering
-  , testRegisterRegisteringSeatCapacity
-  , testUnregisterUnknownReservation
-  , testUnregisterReservation
-  , testUnregisterLastReservation
-  , testPropose
-  , testParseProposals
-  , testParseProposalsIncomplete
-  , testParseProposalsPartialIncomplete
-  , testParseProposalsConflict
-  , testProposalsForReservation
-  , testProposalsForReservationReservation
-  , testProposalsForReservationPassengers
-  , testProposalsForReservationNonExisting
+  [ testGroup "initialise"
+    [ testInitialise
+    , testRegisterInitialised
+    , testRegisterInitialisedSeatCapacity
+    ]
+  , testGroup "register"
+    [ testRegisterRegistering
+    , testRegisterRegisteringSeatCapacity
+    , testUnregisterUnknownReservation
+    ]  
+  , testGroup "unregister"
+    [ testUnregisterReservation
+    , testUnregisterLastReservation
+    ]
+  , testGroup "propose"
+    [ testPropose
+    ]
+  , testGroup "parseProposals"
+    [ testParseProposals
+    , testParseProposalsIncomplete
+    , testParseProposalsPartialIncomplete
+    , testParseProposalsConflict
+    ]
+  , testGroup "proposalsForReservation"
+    [ testProposalsForReservation
+    , testProposalsForReservationReservation
+    , testProposalsForReservationPassengers
+    , testProposalsForReservationNonExisting
+    ]
+  , testGroup "confirm"
+    [ testConfirm
+    , testConfirmPartial
+    , testConfirmUnavailable
+    , testConfirmOverlap
+    ]
+  , testGroup "board"
+    [ testBoard
+    , testBoardUnassigned
+    ]
   ]
 
-
+-- initialise
 testInitialise = testCase "SeatArrangement is initialising with number of seats" $ do
   case initialise numberOfSeats of
     SomeSeatArrangement (SeatArrangementInitialising) -> assertSuccess
@@ -50,6 +72,7 @@ testInitialise = testCase "SeatArrangement is initialising with number of seats"
     Right numberOfSeats = refine 5
 
 
+-- register
 testRegisterInitialised = testCase "SeatArrangement can register reservation when initialising" $ do
   case register reservation initialisingSeatArrangement of 
     Right (_ :: SeatArrangement 5 'Registering) -> assertSuccess
@@ -77,6 +100,8 @@ testRegisterRegisteringSeatCapacity = testCase "SeatArrangement cannot register 
   where
     reservation = mkReservation "d2d082de-2623-4791-b22b-41047c367bd8" 5
 
+
+-- unregister
 testUnregisterUnknownReservation = testCase "SeatArrangement must ignore unregistering unknown reservations" $ do
   case unregister reservation registeringSeatArrangement of 
     RegsteringAfterUnregister (SeatArrangementRegistering (Refined reservations)) -> Set.size reservations @?= 1
@@ -103,6 +128,7 @@ testUnregisterLastReservation = testCase "SeatArrangement must transition to Ini
     reservation = mkReservationId "64839257-4367-495d-aaec-05b30b4f7ee9"
 
 
+-- propose
 testPropose = testCase "SeatArrangement must transition to Proposing on propose" $ do
   case propose registeringSeatArrangement of
     (_ :: SeatArrangement 5 'Proposing) -> assertSuccess
@@ -112,7 +138,7 @@ testPropose = testCase "SeatArrangement must transition to Proposing on propose"
 testParseProposals = testCase "SeatArrangement must transition to Confirming after receiving proposals" $ do
   expectRight (parseProposals proposals proposingSeatArrangement)
   where
-    Right proposals = refine (Set.fromList [proposal])
+    Right proposals = refine (Set.singleton proposal)
     Right proposal = 
       refine $ Bimap.fromList 
         [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 0)
@@ -120,10 +146,11 @@ testParseProposals = testCase "SeatArrangement must transition to Confirming aft
         ]
 
 
+-- parseProposals
 testParseProposalsIncomplete = testCase "SeatArrangement must reject incomplete proposals" $ do
   expectLeftValue ProposalDoesNotCoverAllReservations (parseProposals proposals proposingSeatArrangement)
   where
-    Right proposals = refine (Set.fromList [proposal])
+    Right proposals = refine (Set.singleton proposal)
     Right proposal = 
       refine $ Bimap.fromList 
         [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 0)
@@ -148,7 +175,7 @@ testParseProposalsPartialIncomplete = testCase "SeatArrangement must reject part
 testParseProposalsConflict = testCase "SeatArrangement must reject conflicting proposals" $ do
   expectLeftValue ProposalDoesNotCoverAllReservations (parseProposals proposals proposingSeatArrangement)
   where
-    Right proposals = refine (Set.fromList [proposal])
+    Right proposals = refine (Set.singleton proposal)
     Right proposal =
       refine $ Bimap.fromList 
       [(mkPassenger "446e006a-43bd-4739-816d-9d47797816fa" 0, mkSeat 0)
@@ -156,6 +183,7 @@ testParseProposalsConflict = testCase "SeatArrangement must reject conflicting p
       ]
 
 
+-- proposalsForReservation
 testProposalsForReservation = testCase "SeatArrangement must return all proposals for a reservation" $ do
   case proposalsForReservation reservation confirmingSeatArrangement of
     Right (Refined proposals) -> Set.size proposals @?= 2
@@ -190,7 +218,7 @@ testProposalsForReservationReservation = testCase "SeatArrangement must only ret
 testProposalsForReservationPassengers = testCase "SeatArrangement must return all passenger in proposals for a reservation" $ do
   case proposalsForReservation reservation confirmingSeatArrangement of
     Right (Refined proposals) -> assertBool "includes all passengers" (all includesAllPassengers proposals)
-    Left reason -> assertFailure "expect proposals"
+    Left _ -> assertFailure "expect proposals"
   where
     reservation = mkReservationId "64839257-4367-495d-aaec-05b30b4f7ee9"
     includesAllPassengers (Refined proposal) = Bimap.size proposal == 2
@@ -202,7 +230,89 @@ testProposalsForReservationNonExisting = testCase "SeatArrangement must not retu
     reservation = mkReservationId "8322add6-b37f-48dd-b5ac-4b3370d19163"
 
 -- confirm
--- prepareBoarding
+testConfirm = testCase "SeatArrangement must confirm proposal" $ do
+  expectRight (confirm reservation proposal confirmingSeatArrangement)
+  where 
+    Right proposal = 
+      refine $ Bimap.fromList 
+        [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 0)
+        ,(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 1, mkSeat 1)
+        ]
+    reservation = mkReservationId "64839257-4367-495d-aaec-05b30b4f7ee9"
+
+
+testConfirmPartial = testCase "SeatArrangement must not confirm partial proposal" $ do
+  expectLeftValue ConfirmProposalNotAvailable (confirm reservation proposal confirmingSeatArrangement)
+  where 
+    Right proposal = 
+      refine $ Bimap.fromList 
+        [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 0)
+        ]
+    reservation = mkReservationId "64839257-4367-495d-aaec-05b30b4f7ee9"
+
+testConfirmUnavailable = testCase "SeatArrangement must not confirm unavailable proposal" $ do
+  expectLeftValue ConfirmProposalNotAvailable (confirm reservation proposal confirmingSeatArrangement)
+  where 
+    Right proposal = 
+      refine $ Bimap.fromList 
+        [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 1)
+        ,(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 1, mkSeat 2)
+        ]
+    reservation = mkReservationId "64839257-4367-495d-aaec-05b30b4f7ee9"
+
+
+testConfirmOverlap = testCase "SeatArrangement must not confirm overlapping proposals" $ do
+  expectLeftValue ConfirmProposalNotAvailable (confirm reservation1Id reservation1Proposal confirminSeatArrangementWithConfirmation)
+  where
+    Right confirminSeatArrangementWithConfirmation = confirm reservation2Id reservation2Proposal confirminSeatArrangement
+    Right confirminSeatArrangement = parseProposals proposals proposingSeatArrangement
+    Right proposingSeatArrangement = propose <$> (register reservation1 initialisingSeatArrangement >>= register reservation2)
+
+    Right proposals = refine (Set.fromList [proposal1, proposal2])
+    Right proposal1 =
+      refine $ Bimap.fromList 
+        [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 0)
+        ,(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 1, mkSeat 1)
+        ,(mkPassenger "52bff891-4e69-48e0-9900-7c80fe926fa0" 0, mkSeat 2)
+        ]
+    Right proposal2 =
+      refine $ Bimap.fromList 
+        [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 2)
+        ,(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 1, mkSeat 1)
+        ,(mkPassenger "52bff891-4e69-48e0-9900-7c80fe926fa0" 0, mkSeat 0)
+        ]
+
+    reservation1Id = mkReservationId "64839257-4367-495d-aaec-05b30b4f7ee9"
+    reservation1 = mkReservation "64839257-4367-495d-aaec-05b30b4f7ee9" 2
+    Right reservation1Proposal = 
+      refine $ Bimap.fromList 
+        [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 0)
+        ,(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 1, mkSeat 1)
+        ]
+
+    reservation2Id = mkReservationId "52bff891-4e69-48e0-9900-7c80fe926fa0"
+    reservation2 = mkReservation "52bff891-4e69-48e0-9900-7c80fe926fa0" 1
+    Right reservation2Proposal = 
+      refine $ Bimap.fromList 
+        [(mkPassenger "52bff891-4e69-48e0-9900-7c80fe926fa0" 0, mkSeat 0)
+        ]
+
+
+-- board
+testBoard = testCase "SeatArrangement must board if all seats are assigned" $ do
+  expectRight (board seatArrangement)
+  where 
+    Right seatArrangement = confirm reservation proposal confirmingSeatArrangement
+    Right proposal = 
+      refine $ Bimap.fromList 
+        [(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 0, mkSeat 0)
+        ,(mkPassenger "64839257-4367-495d-aaec-05b30b4f7ee9" 1, mkSeat 1)
+        ]
+    reservation = mkReservationId "64839257-4367-495d-aaec-05b30b4f7ee9"
+
+
+testBoardUnassigned = testCase "SeatArrangement must not board if seats are unassigned" $ do
+  expectLeftValue BoardNotAllowedWithUnassignedSeats (board confirmingSeatArrangement)
 
 
 -- fixtures

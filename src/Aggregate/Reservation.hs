@@ -15,7 +15,8 @@ module Aggregate.Reservation
 
 import GHC.TypeLits (Nat, KnownNat, natVal)
 import Control.Exception.Base (Exception, toException, fromException)
-import Data.Text (Text, pack)
+import Data.Text (Text)
+import Data.Text qualified as Text
 import Data.Typeable (Proxy(..), typeRep)
 import Data.Maybe (fromMaybe)
 import Data.Set (Set)
@@ -82,7 +83,7 @@ data ReservationsProblem
 parseReservationsProblem :: RefineException -> ReservationsProblem
 parseReservationsProblem exception = 
   fromMaybe 
-    (ReservationsCorrupt (pack (show exception)))
+    (ReservationsCorrupt (Text.show exception))
     (parseSomeException exception >>= fromException)
 
 
